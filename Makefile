@@ -4,17 +4,20 @@
 #
 RAMDISK = #-DRAMDISK=512
 
-AS86	=as86 -0 -a
-LD86	=ld86 -0
+#AS86	=as86 -0 -a
+#LD86	=ld86 -0
 
-AS	=gas
-LD	=gld
+#AS	=gas
+#LD	=gld
+AS=arm-linux-as
+LD=arm-linux-ld
 LDFLAGS	=-s -x -M
-CC	=gcc $(RAMDISK)
+#CC	=gcc $(RAMDISK)
+CC=arm-linux-gcc
 CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
 -fcombine-regs -mstring-insns
-CPP	=cpp -nostdinc -Iinclude
-
+#CPP	=cpp -nostdinc -Iinclude
+CPP=arm-linux-cpp -nostdinc -Iinclude
 #
 # ROOT_DEV specifies the default root-device when making the image.
 # This can be either FLOPPY, /dev/xxxx or empty, in which case the
@@ -24,44 +27,59 @@ ROOT_DEV=/dev/hd6
 
 ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
 DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
-MATH	=kernel/math/math.a
+#MATH	=kernel/math/math.a
 LIBS	=lib/lib.a
 
 .c.s:
 	$(CC) $(CFLAGS) \
 	-nostdinc -Iinclude -S -o $*.s $<
 .s.o:
-	$(AS) -c -o $*.o $<
+	$(AS) -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) \
-	-nostdinc -Iinclude -c -o $*.o $<
+	-nostdinc -Iinclude -o $*.o $<
 
 all:	Image
 
-Image: boot/bootsect boot/setup tools/system tools/build
-	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) > Image
+#Image: boot/bootsect boot/setup tools/system tools/build
+#	tools/build boot/bootsect boot/setup tools/system $(ROOT_DEV) > Image
+
+Image:  tools/system tools/build
+	tools/build  tools/system > Image
 	sync
 
-disk: Image
-	dd bs=8192 if=Image of=/dev/PS0
+#disk: Image
+#	dd bs=8192 if=Image of=/dev/PS0
 
 tools/build: tools/build.c
 	$(CC) $(CFLAGS) \
 	-o tools/build tools/build.c
 
-boot/head.o: boot/head.s
+boot/head.o: boot/head_arm.s
+#boot/head.o: boot/head.s
+
+#tools/system:	boot/head.o init/main.o \
+#		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+#	$(LD) $(LDFLAGS) boot/head.o init/main.o \
+#	$(ARCHIVES) \
+#	$(DRIVERS) \
+#	$(MATH) \
+#	$(LIBS) \
+#	-o tools/system > System.map
+
 
 tools/system:	boot/head.o init/main.o \
-		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+		$(ARCHIVES) $(DRIVERS) $(LIBS)
 	$(LD) $(LDFLAGS) boot/head.o init/main.o \
 	$(ARCHIVES) \
 	$(DRIVERS) \
-	$(MATH) \
 	$(LIBS) \
 	-o tools/system > System.map
 
-kernel/math/math.a:
-	(cd kernel/math; make)
+
+
+#kernel/math/math.a:
+#	(cd kernel/math; make)
 
 kernel/blk_drv/blk_drv.a:
 	(cd kernel/blk_drv; make)
@@ -81,13 +99,13 @@ fs/fs.o:
 lib/lib.a:
 	(cd lib; make)
 
-boot/setup: boot/setup.s
-	$(AS86) -o boot/setup.o boot/setup.s
-	$(LD86) -s -o boot/setup boot/setup.o
+#boot/setup: boot/setup.s
+#	$(AS86) -o boot/setup.o boot/setup.s
+#	$(LD86) -s -o boot/setup boot/setup.o
 
-boot/bootsect:	boot/bootsect.s
-	$(AS86) -o boot/bootsect.o boot/bootsect.s
-	$(LD86) -s -o boot/bootsect boot/bootsect.o
+#boot/bootsect:	boot/bootsect.s
+#	$(AS86) -o boot/bootsect.o boot/bootsect.s
+#	$(LD86) -s -o boot/bootsect boot/bootsect.o
 
 tmp.s:	boot/bootsect.s tools/system
 	(echo -n "SYSSIZE = (";ls -l tools/system | grep system \

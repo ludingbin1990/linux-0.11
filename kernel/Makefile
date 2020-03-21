@@ -6,15 +6,19 @@
 # unless it's something special (ie not a .c file).
 #
 
-AR	=gar
-AS	=gas
-LD	=gld
+#AR	=gar
+#AS	=gas
+#LD	=gld
 LDFLAGS	=-s -x
-CC	=gcc
-CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer -fcombine-regs \
-	-finline-functions -mstring-insns -nostdinc -I../include
-CPP	=gcc -E -nostdinc -I../include
-
+#CC	=gcc
+AS=arm-linux-as
+AR=arm-linux-ar
+LD=arm-linux-ld
+CC=arm-linux-gcc
+CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
+	-finline-functions -nostdinc -I../include
+#CPP	=gcc -E -nostdinc -I../include
+CPP	=arm-linux-gcc -E -nostdinc -I../include
 .c.s:
 	$(CC) $(CFLAGS) \
 	-S -o $*.s $<

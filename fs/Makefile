@@ -1,11 +1,15 @@
-AR	=gar
-AS	=gas
-CC	=gcc
-LD	=gld
-CFLAGS	=-Wall -O -fstrength-reduce -fcombine-regs -fomit-frame-pointer \
-	-mstring-insns -nostdinc -I../include
-CPP	=gcc -E -nostdinc -I../include
-
+#AR	=gar
+#AS	=gas
+#CC	=gcc
+#LD	=gld
+CFLAGS	=-Wall -O -fstrength-reduce -fomit-frame-pointer \
+	-nostdinc -I../include
+#CPP	=gcc -E -nostdinc -I../include
+AS=arm-linux-as
+AR=arm-linux-ar
+LD=arm-linux-ld
+CC=arm-linux-gcc
+CPP=arm-linux-gcc -E -nostdinc -I../include
 .c.s:
 	$(CC) $(CFLAGS) \
 	-S -o $*.s $<

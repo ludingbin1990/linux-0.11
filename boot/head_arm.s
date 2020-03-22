@@ -7,7 +7,7 @@
 #define PAGE_OFFSET 0xC0000000
 #define S3C24XX_PA_UART 0x50000000
 #define S3C24XX_VA_UART 0xF7000000
-
+extern _bstart, _bend;
 .section .text
 
 .globl _start
@@ -257,8 +257,8 @@ __turn_mmu_on_end:
 .section.data
 
 __mmap_switched_data:
-	.long	__bss_start			@ r6
-	.long	_end				@ r7
+	.long	_bstart			@ r6
+	.long	_bend				@ r7
 
 __turn_mmu_on_loc:
 	.long	.

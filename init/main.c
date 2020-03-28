@@ -38,7 +38,34 @@ static inline _syscall0(int,sync)
 #include <sys/types.h>
 
 #include <linux/fs.h>
-
+/*
+ * PSR bits
+ */
+#define USR26_MODE	0x00000000
+#define FIQ26_MODE	0x00000001
+#define IRQ26_MODE	0x00000002
+#define SVC26_MODE	0x00000003
+#define USR_MODE	0x00000010
+#define FIQ_MODE	0x00000011
+#define IRQ_MODE	0x00000012
+#define SVC_MODE	0x00000013
+#define ABT_MODE	0x00000017
+#define HYP_MODE	0x0000001a
+#define UND_MODE	0x0000001b
+#define SYSTEM_MODE	0x0000001f
+#define MODE32_BIT	0x00000010
+#define MODE_MASK	0x0000001f
+#define PSR_T_BIT	0x00000020
+#define PSR_F_BIT	0x00000040
+#define PSR_I_BIT	0x00000080
+#define PSR_A_BIT	0x00000100
+#define PSR_E_BIT	0x00000200
+#define PSR_J_BIT	0x01000000
+#define PSR_Q_BIT	0x08000000
+#define PSR_V_BIT	0x10000000
+#define PSR_C_BIT	0x20000000
+#define PSR_Z_BIT	0x40000000
+#define PSR_N_BIT	0x80000000
 static char printbuf[1024];
 
 extern int vsprintf();
@@ -98,8 +125,47 @@ static void time_init(void)
 static long memory_end = 0;
 static long buffer_memory_end = 0;
 static long main_memory_start = 0;
-
+typedef unsigned int u32;
 struct drive_info { char dummy[32]; } drive_info;
+#define NR_CPUS 1
+struct stack {
+	u32 irq[3];
+	u32 abt[3];
+	u32 und[3];
+} ____cacheline_aligned;
+
+static struct stack stacks[NR_CPUS];
+
+void cpu_init(void)
+{
+	struct stack *stk = &stacks[0];
+	/*
+	 * setup stacks for re-entrant exception handlers
+	 */
+	__asm__ (
+	"msr	cpsr_c, %1\n\t"
+	"add	r14, %0, %2\n\t"
+	"mov	sp, r14\n\t"
+	"msr	cpsr_c, %3\n\t"
+	"add	r14, %0, %4\n\t"
+	"mov	sp, r14\n\t"
+	"msr	cpsr_c, %5\n\t"
+	"add	r14, %0, %6\n\t"
+	"mov	sp, r14\n\t"
+	"msr	cpsr_c, %7"
+	    :
+	    : "r" (stk),
+	      "I" (PSR_F_BIT | PSR_I_BIT | IRQ_MODE),
+	      "I" (offsetof(struct stack, irq[0])),
+	      "I" (PSR_F_BIT | PSR_I_BIT | ABT_MODE),
+	      "I" (offsetof(struct stack, abt[0])),
+	      "I" (PSR_F_BIT | PSR_I_BIT | UND_MODE),
+	      "I" (offsetof(struct stack, und[0])),
+	      "I" (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
+	    : "r14");
+}
+
+
 
 void main(void)		/* This really IS void, no error here. */
 {			/* The startup routine assumes (well, ...) this */
@@ -123,6 +189,7 @@ void main(void)		/* This really IS void, no error here. */
 #ifdef RAMDISK
 	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
+	cpu_init();
 	mem_init(main_memory_start,memory_end);
 	trap_init();
 	blk_dev_init();

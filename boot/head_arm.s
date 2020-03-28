@@ -1,14 +1,6 @@
+#include "../config/arm_config"
 .arm
-#define PHYS_OFFSET 0x30000000
-#define TEXT_OFFSET 0x01000000
-#define PG_DIR_SIZE	0x4000
-#define PMD_ORDER	2
-#define SECTION_SHIFT 20
-#define PAGE_OFFSET 0xC0000000
-#define S3C24XX_PA_UART 0x50000000
-#define S3C24XX_VA_UART 0xF7000000
-extern _bstart, _bend;
-.section .text
+.text
 
 .globl _start
 
@@ -54,9 +46,9 @@ _start:
 
 
 
-/* 1.2 Map our RAM from the start to the end of the kernel .bss section.*/
+/* 1.2 Map our RAM from the start to the end */
 	add	r0, r4, #PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER)
-	ldr	r6, =(_end - 1)
+	ldr	r6, =(PAGE_OFFSET+PHYS_SIZE)
 	orr	r3, r8, r7
 	add	r6, r4, r6, lsr #(SECTION_SHIFT - PMD_ORDER)
 1:	str	r3, [r0], #1 << PMD_ORDER
@@ -121,8 +113,7 @@ __arm920_setup:
 	orr	r0, r0, r6
 	mov	pc, lr
 
-arm920_crval:
-	crval	clear=0x00003f3f, mmuset=0x00003135, ucset=0x00001130
+
 
 
 
@@ -239,7 +230,7 @@ __mmap_switched:
 	strcc	fp, [r6],#4
 	bcc	1b
 
-	adr sp,stack_start
+	ldr sp,=stack_start
 	b	main
 
 
@@ -254,7 +245,11 @@ __turn_mmu_on:
 __turn_mmu_on_end:
 .align	4
 
-.section.data
+.data
+
+arm920_crval:
+	.word 0x00003f3f
+	.word 0x00003135
 
 __mmap_switched_data:
 	.long	_bstart			@ r6
@@ -283,4 +278,3 @@ io_mmu_flags:
 		PMD_SECT_AP_WRITE | \
 		PMD_SECT_AP_READ*/
 
-.section .bss

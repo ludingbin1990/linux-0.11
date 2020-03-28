@@ -1,9 +1,10 @@
+#include "./config/used_config"
 OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(_start)
 SECTIONS
 {
-	.text 0xC0000000: { *(.text) }
+	.text VM_TEXT_START_ASSRESS: { *(.text) }
 	. = ALIGN(4);
 	.data : { *(.data) }
 	. = ALIGN(4);

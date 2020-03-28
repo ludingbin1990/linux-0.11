@@ -16,7 +16,7 @@
 #include <linux/kernel.h>
 #include <asm/segment.h>
 #include <asm/system.h>
-
+#include "../config/used_config"
 extern void write_verify(unsigned long address);
 
 long last_pid=0;
@@ -65,6 +65,10 @@ int copy_mem(int nr,struct task_struct * p)
  * information (task[nr]) and sets up the necessary registers. It
  * also copies the data segment in it's entirety.
  */
+#ifdef S3C2440
+
+
+#else
 int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		long ebx,long ecx,long edx,
 		long fs,long es,long ds,
@@ -131,7 +135,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->state = TASK_RUNNING;	/* do this last, just in case */
 	return last_pid;
 }
-
+#endif
 int find_empty_process(void)
 {
 	int i;

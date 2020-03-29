@@ -7,6 +7,8 @@
 #define S_OLD_R0 68
 #define STATE_OFFSET 0
 #define COUNT_OFFSET 4
+#define SIGNAL_OFFSET 12
+#define BLOCKED_OFFSET (33*16)
 .arm
 .text
 
@@ -29,22 +31,6 @@
 	mov	\rd, \rd, lsl #12
 .endm
 
-
-.macro	restore_user_regs, fast = 0, offset = 0
-	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
-	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
-	msr	spsr_cxsf, r1			@ save in spsr_svc
-	.if	\fast
-	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
-	.else
-	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
-	.endif
-	mov	r0, r0				@ ARMv5T and earlier require a nop
-						@ after ldm {}^
-	add	sp, sp, #S_FRAME_SIZE - S_PC
-	movs	pc, lr				@ return & move spsr_svc into cpsr
-.endm
-
 	.align	5
 __irq_usr:
 	usr_entry
@@ -55,12 +41,9 @@ __irq_usr:
 __irq_usr_1:
 	get_thread_info r9  @task struct is r9
 	mov	r8, #0
-	b	ret_to_user_from_irq
-
-
-ret_to_user_from_irq:
-	restore_user_regs fast = 0, offset = 0
-
+	sub sp,sp,#8    @for match the below return code,need to move the sp to the sp-8
+	
+	b ret_from_syscall_and_irq_to_user
 
 .macro	svc_exit, rpsr, irq = 0
 	.if	\irq != 0
@@ -194,7 +177,7 @@ vector_swi:
 	adr	r8, sys_call_table		@ load syscall table pointer
 
 	stmdb	sp!, {r4, r5}			@ push fifth and sixth args
-	adr	lr, ret_from_syscall1	@ return address
+	adr	lr, ret_from_syscall	@ return address
 	cmp	r7, #72		@ check upper syscall limit,asume the max system call number is 72
 	ldrcc	pc, [r8, r7, lsl #2]		@ call sys_* routine	
 	b	bad_sys_call			@ system call number invalid
@@ -206,36 +189,38 @@ vector_swi:
  * stack.
  */
 reschedule:
-	adr  lr,ret_from_syscall2
+	adr  lr,ret_from_reschedule
 	b schedule
-
-ret_from_syscall1:
-	                                        @ msr     CPSR_c, #147    @ 0x93			@ disable interrupts
+ret_from_syscall:
+	msr     CPSR_c, #147    @ 0x93			@ disable interrupts
+	ldr [sp,#8],r0   @saved the system call return value
+ret_from_syscall_and_irq_to_user:
 	cmp	[r9, #STATE_OFFSET],#0         @the task not in running state,need reschedule
 	bne     reschedule
 	cmp	[r9, #COUNT_OFFSET],#0         @the task run too long time,need reschedule
-	beq      reschedule
-
-ret_from_syscall2:
-	
+	beq      reschedule	
+ret_from_reschedule:
 	ldr r1,=current   @get the current address
 	ldr r2,=task     @get the task0 address
 	cmp [r1],r2      @compare if the current value equal to the task0 address,if current task not task0,ignore the signal
-	beq ret_form_syscall3
-
-
-
-
-ret_form_syscall3:
-
-	ldr r1,[sp,#72]    @get the saved cpsr
-	ldr lr,[sp,#68]!    @get the saved return address,and update the sp to the S_PC
+	beq ret_to_user
+	ldr r1,[r9,#SIGNAL_OFFSET]     @get the current task signal value
+	ldr r2,[r9,#BLOCKED_OFFSET]	@get the current task signal blocked value
+	mvn r2,r2		@revert the signal blocked value
+	and r1,r1,r2		@check if there have signal process
+	cmp r1,#0
+	beq ret_to_user    	@no signal process,prepare to return
+	adr  lr,ret_to_user  
+	b do_signal             @have signal process,go to process
+ret_to_user:
+	ldr r1,[sp,#S_PSR+8]    @get the saved cpsr,because in the system call code sp move to the sp-8 ponit,so need to correct it
+	ldr lr,[sp,#S_PC+8]!    @get the saved return address,and update the sp to the S_PC
 	msr	spsr_cxsf, r1
-	ldmdb	sp, {r1 - lr}^
+	ldmdb	sp, {r0 - lr}^
 	mov	r0, r0
 	add	sp, sp, #S_FRAME_SIZE - S_PC   @reset the kernel stack equal to the enter kernel
 	movs	pc, lr
-	
+
 
 	.globl	__stubs_start
 __stubs_start:

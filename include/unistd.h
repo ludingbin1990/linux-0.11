@@ -1,6 +1,6 @@
 #ifndef _UNISTD_H
 #define _UNISTD_H
-
+#include "../config/used_config"
 /* ok, this may be a joke, but I'm working on it */
 #define _POSIX_VERSION 198808L
 
@@ -54,7 +54,7 @@
 #include <sys/times.h>
 #include <sys/utsname.h>
 #include <utime.h>
-
+#include "../config/used_config"
 #ifdef __LIBRARY__
 
 #define __NR_setup	0	/* used only by init, to get system going */
@@ -129,7 +129,67 @@
 #define __NR_ssetmask	69
 #define __NR_setreuid	70
 #define __NR_setregid	71
+#ifdef S3C2440
+#define _syscall0(type,name) \
+type name(void) \
+{ \
+register int  _a1 __asm__ ("r0"); \
+__asm__ volatile ("swi  %1" \
+	: "=r" (_a1) \
+	: "i" (__NR_##name)   \
+	: "memory","r0"); \
+	if (_a1 >= 0) \
+		return (type) _a1; \
+	errno = -_a1; \
+	return -1; \
+}
 
+#define _syscall1(type,name,atype,a) \
+type name(atype a) \
+{ \
+register int _a1 __asm__ ("r0")= (int) (a);\
+__asm__ volatile ("swi  %1" \
+	: "=r" (_a1) \
+	: "i" (__NR_##name),"r" ((int)(_a1)) \
+	: "memory","r0"); \
+	if (_a1 >= 0) \
+		return (type) _a1; \
+	errno = -_a1; \
+	return -1; \
+}
+
+#define _syscall2(type,name,atype,a,btype,b) \
+type name(atype a,btype b) \
+{ \
+register int _a1 __asm__ ("r0")=(int) (a);\
+register int _a2 __asm__ ("r1") = (int) (b);\
+__asm__ volatile ("swi  %1" \
+	: "=r" (_a1) \
+	: "i" (__NR_##name),"r" ((int)(_a1)),"r" ((int)(_a2))
+	: "memory","r0","r1"); \
+if (_a1 >= 0) \
+	return (type) _a1; \
+errno = -_a1; \
+return -1; \
+}
+
+#define _syscall3(type,name,atype,a,btype,b,ctype,c) \
+type name(atype a,btype b,ctype c) \
+{ \
+register int _a1 __asm__ ("r0") = (int) (a);\
+register int _a2 __asm__ ("r1") = (int) (b);\
+register int _a3 __asm__ ("r2") = (int) (c);\
+__asm__ volatile ("swi  %1" \
+	: "=r" (_a1) \
+	: "i" (__NR_##name),"r" ((int)(_a1)),"r" ((int)(_a2)),"r" ((int)(_a3))
+	: "memory","r0","r1","r2"); \
+if (_a1>=0) \
+	return (type) _a1; \
+errno=-_a1; \
+return -1; \
+}
+
+#else
 #define _syscall0(type,name) \
 type name(void) \
 { \
@@ -183,7 +243,7 @@ return -1; \
 }
 
 #endif /* __LIBRARY__ */
-
+#endif
 extern int errno;
 
 int access(const char * filename, mode_t mode);

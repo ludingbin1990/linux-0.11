@@ -54,8 +54,8 @@ union task_union {
 	struct task_struct task;
 	char stack[PAGE_SIZE];
 };
-
-static union task_union init_task = {INIT_TASK,};
+#define __init_task_data __attribute__((__section__(".data..init_task")))
+static union task_union init_task __init_task_data= {INIT_TASK,};
 
 long volatile jiffies=0;
 long startup_time=0;

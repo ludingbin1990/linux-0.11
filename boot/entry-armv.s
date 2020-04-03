@@ -188,6 +188,15 @@ vector_swi:
  * possible here, and this includes saving r0 back into the SVC
  * stack.
  */
+.globl ret_from_fork
+ret_from_fork:
+	msr     CPSR_c, #147    @ 0x93			@ disable interrupts
+	get_thread_info r9  @task struct is r9
+	sub sp,sp,#8    @for match the below return code,need to move the sp to the sp-8
+	bl ret_from_syscall_and_irq_to_user
+
+
+
 reschedule:
 	adr  lr,ret_from_reschedule
 	b schedule

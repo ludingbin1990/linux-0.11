@@ -16,7 +16,6 @@
 #include <linux/kernel.h>
 #include <asm/segment.h>
 #include <asm/system.h>
-#include "../config/used_config"
 extern void write_verify(unsigned long address);
 
 long last_pid=0;
@@ -36,6 +35,71 @@ void verify_area(void * addr,int size)
 	}
 }
 
+
+/*
+ *  Ok, this is the main fork-routine. It copies the system process
+ * information (task[nr]) and sets up the necessary registers. It
+ * also copies the data segment in it's entirety.
+ */
+#ifdef S3C2440
+int copy_mem(int nr,struct task_struct * p)
+{
+	new_data_base = new_code_base = nr * 0x4000000;
+	p->start_code = new_code_base;
+	set_base(p->ldt[1],new_code_base);
+	set_base(p->ldt[2],new_data_base);
+	if (copy_page_tables(old_data_base,new_data_base,data_limit)) {
+		free_page_tables(new_data_base,data_limit);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+int copy_process(int nr)
+{
+	struct task_struct *p;
+	struct pt_regs *childregs;
+	int i;
+	struct file *f;
+	p = (struct task_struct *) get_free_page();
+	if (!p)
+		return -EAGAIN;
+	childregs = task_pt_regs(p);
+	*childregs = *current_pt_regs();
+	memset(&(p->tss),0,sizeof(struct tss_struct));
+	task[nr] = p;
+	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+	p->state = TASK_UNINTERRUPTIBLE;
+	p->pid = last_pid;
+	p->father = current->pid;
+	p->counter = p->priority;
+	p->signal = 0;
+	p->alarm = 0;
+	p->leader = 0;		/* process leadership doesn't inherit */
+	p->utime = p->stime = 0;
+	p->cutime = p->cstime = 0;
+	p->start_time = jiffies;
+	childregs->ARM_r0 = 0;
+	p->tss.sp = (unsigned long)childregs;
+	p->tss.pc = unsigned long)ret_from_fork;
+	if (copy_mem(nr,p)) {
+		task[nr] = NULL;
+		free_page((long) p);
+		return -EAGAIN;
+	}
+	for (i=0; i<NR_OPEN;i++)
+		if (f=p->filp[i])
+			f->f_count++;
+	if (current->pwd)
+		current->pwd->i_count++;
+	if (current->root)
+		current->root->i_count++;
+	if (current->executable)
+		current->executable->i_count++;
+	p->state = TASK_RUNNING;	/* do this last, just in case */
+	return last_pid;
+}
+#else
 int copy_mem(int nr,struct task_struct * p)
 {
 	unsigned long old_data_base,new_data_base,data_limit;
@@ -60,15 +124,6 @@ int copy_mem(int nr,struct task_struct * p)
 	return 0;
 }
 
-/*
- *  Ok, this is the main fork-routine. It copies the system process
- * information (task[nr]) and sets up the necessary registers. It
- * also copies the data segment in it's entirety.
- */
-#ifdef S3C2440
-
-
-#else
 int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		long ebx,long ecx,long edx,
 		long fs,long es,long ds,

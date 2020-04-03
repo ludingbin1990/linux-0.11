@@ -223,14 +223,12 @@ printascii:
 __mmap_switched:
 	adr	r3, __mmap_switched_data
 
-	ldmia	r3!, {r6, r7}
+	ldmia	r3!, {r6, r7 ,sp}
 
 	mov	fp, #0				@ Clear BSS (and zero fp)
 1:	cmp	r6, r7
 	strcc	fp, [r6],#4
 	bcc	1b
-
-	ldr sp,=stack_start
 	b	main
 
 
@@ -254,7 +252,7 @@ arm920_crval:
 __mmap_switched_data:
 	.long	_bstart			@ r6
 	.long	_bend				@ r7
-
+	.long    init_task + THREAD_START_SP @ sp
 __turn_mmu_on_loc:
 	.long	.
 	.long	__turn_mmu_on
